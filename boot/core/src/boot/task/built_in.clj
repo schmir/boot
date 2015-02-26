@@ -196,9 +196,11 @@
    p port PORT      int   "The port to listen on and/or connect to."
    n init-ns NS     sym   "The initial REPL namespace."
    m middleware SYM [sym] "The REPL middleware vector."
+   t tasks SYM      [sym] "tasks to run"
    x handler SYM    sym   "The REPL handler (overrides middleware options)."]
 
   (let [srv-opts (select-keys *opts* [:bind :port :init-ns :middleware :handler])
+        task-handlers (mapv resolve tasks)
         cli-opts (-> *opts*
                      (select-keys [:host :port :history])
                      (assoc :standalone true
@@ -214,7 +216,8 @@
                         ((resolve 'boot.repl-server/start-server) srv-opts))
         repl-cli (delay (pod/with-call-worker (boot.repl-client/client ~cli-opts)))]
     (comp
-      (core/with-pre-wrap fileset
+     (apply comp (map (fn [x] (x)) task-handlers))
+     (core/with-pre-wrap fileset
         (when (or server (not client)) @repl-svr)
         fileset)
       (core/with-post-wrap _
